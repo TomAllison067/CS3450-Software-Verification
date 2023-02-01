@@ -8,3 +8,9 @@ Structure (not set in stone):
 
 ## Examples
 `cbmc example-programs/simpleBufferOverflow.c --show-properties --bounds-check`
+
+# Useful links
+* Manual: http://www.cprover.org/cprover-manual/
+* Symbolic simulation: https://en.wikipedia.org/wiki/Symbolic_simulation
+* CBMC whitepaper (A Tool for Checking ANSI-C Programs): http://www.kroening.com/papers/tacas2004.pdf
+* Abstract domains / Abstract interpretation: https://en.wikipedia.org/wiki/Abstract_interpretation   
