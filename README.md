@@ -7,4 +7,4 @@ Structure (not set in stone):
   * cbmc does static analysis without needing compiled files - so actually, probably don't need the build folder + makefile
 
 ## Examples
-cbmc example-programs/simpleBufferOverflow.c --show-properties --bounds-check
+`cbmc example-programs/simpleBufferOverflow.c --show-properties --bounds-check`
