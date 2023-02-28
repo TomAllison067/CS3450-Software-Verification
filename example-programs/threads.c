@@ -4,6 +4,10 @@
 #include <unistd.h>
 #include <pthread.h>
 
+/*
+  This program will generate an assertion failure, g may not always be bound to 1.
+  This can be fixed with pthread_join(id1, null) before the assignment.
+*/
 int g;
 
 void *thread (void *arg) {
