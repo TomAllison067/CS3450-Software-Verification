@@ -1,0 +1,84 @@
+
+## What is CBMC?
+CBMC is a sound bounded model checker for C programs. 
+
+The user can provide properties to be checked, relating to, for example, memory leaks, pointer safety, and division by zero (http://www.cprover.org/cprover-manual/properties/).
+A property is defined as the state of the program when the program reaches a program location. 
+
+It can be used on all sorts of software, but one particular domain mentioned is software with real-time guarantees. For example, embedded software in hardware controllers may have 
+strict bounds on the number of iterations in loops, in which case CBMC is able to verify these bounds using loop unwinding, which will be elaborated on later in this video.
+
+CBMC is a sound tool, rather than a complete tool. It proves the absence of errors by verifying that properties hold on programs, rather than trying to find bugs. Note that its soundness
+ is in context of the right properties being verified: the user can provide many properties to the command-line, e.g. `--memory-leak-check` and `--bounds-check`, but if you don't provide
+ the right properties for your program, then certain bugs may not be found.
+
+## How it does it
+
+Properties are specified using assertions. If you weren't to use CBMC, you could write assertions in the code directly using the `assert` macro from the `assert.h` C libary, and any 
+assertions that fail would only be caught at run-time. CBMC has an assertion generator that automatically generates assertions under the hood according to the properties specified,
+and checks these along with any programmer-written assertions without needing to compile the program.
+
+Using a technique called symbolic simulation, CBMC translates the program into a boolean formula, which is then passed to a built-in SAT solver which verifies each property holds.
+(ref: http://www.cprover.org/cprover-manual/introduction/ http://www.cprover.org/cprover-manual/cbmc/tutorial/) 
+
+These properties are all reachability properties. That is, CBMC asks the question "Is there a path through the program
+such that some property is violated?"
+
+If a property is violated, then CBMC can generate a counterexample in the form of a program trace.
+
+## Race conditions
+So, first, a simple example program taken straight from the CBMC tutorial.
+
+In this program, we have variable g that is shared by two threads. We launch a thread that sets the value of g to 2, and then set it to 1 in the main thread.
+
+The user-specified assertion here asserts that g should be equal to 1, but depending on the order of execution of the threads, this assertion may fail.
+
+You could run this program many times over, as we did, and never fail this assertion - but CBMC won't let you get away with that. Imagine if this was some very complex and safety-critical system,
+then CBMC would really shine through - we don't want to wait until runtime for an assertion to fail and our software to crash, even if the chance is small!
+
+## Segmentation faults
+Building on from this example, we can show another property that this program would fail. In this example, we declare a pointer to a struct that is intended to hold the thread ID returned by
+`pthread_create`, but do not allocate any memory to it.
+
+This program is valid C and will compile and run, but when we run it we'll hit a segmentation fault as we try to access uninitialized memory. The correct way would be to `malloc` the memory
+as shown in the comments in the source code.
+
+Verifying this with the `--pointer-check` option, CBMC shows us that the program fails numerous automatically generated assertions regarding pointers.
+
+## Loop unwinding 1
+http://www.cprover.org/cprover-manual/cbmc/unwinding/
+
+CBMC model's a program's execution up to a bounded number of steps, achieved by a process known as loop unwinding. This can be thought of as the checker transforming loop code into equivalent
+code without loops. For example, figure 1 on the left shows a while loop. If we tell the model checker to search for bugs for up to five iterations, then it corresponds to checking the loop-free code
+in figure 2.
+
+CBMC can often automatically determine an upper boudn on the loop iterations. Figure 3 shows code with an upper bound of 100, but note that the loop could prematurely terminate depending on the return value
+of function f(). Even though the bound is not constant, CBMC may still be able to unwind the loop to completion.
+
+
+## Loop unwinding 2
+The automatic detection of loop unwinding may fail if the number of loop iterations is highly data-dependent, or, in this example, depends on user input.
+
+In the program in figure 1, there is an array-out-of-bounds error that occurs on line 17 if the value of i is greater than or equal to 10. If we compile and run this program, it'll ask us 
+for input to set the value of `n`. If `n` is greater than 10 then `i` is set to a value >= 10 and the inner if statement is entered, 
+and we assign to an array outside of its bounds.
+
+Again, this program will compile and run without any errors - but this is dangerous: buffer overflow attacks can happen if someone assigns malicious code to a certain address next to an array,
+which can be executed if we access that address by accident in our program. We really need to be able to avoid manipulating addresses which we shouldn't be able to.
+
+If we run CBMC on this with `cbmc loop_unwinding.c --bounds-check`, it'll unwind the loop indefinitely and the analysis will never finish.
+
+To fix this, we can set the unwind limit for all loops in the program with the `--unwind` option, or for specific loops with `--unwindset`.
+
+## Properties are important!
+In the program on the right, we declare a pointer to an int with memory allocated for 10 integers, and we treat this as an array. We assign 10 values to this array,
+but print 11 values.
+
+If we run this program, the last value printed out is some random, undefined number, because we're accessing some random memory just after the array.
+
+Now, with this program, we thought we'd finally found a bug that CBMC claims to find but actually fails - we ran it with the `--bounds-check` property and the verification passed.
+
+It turns out we were wrong: we needed to run it with the `--pointer-check` property, and the verification fails: we get a dereference failure, "pointer outside object bounds".
+
+So, CBMC really is very good - we didn't manage to beat it, but it does reinforce the point that it's important to specify the right properties to be checked. Again, CBMC is sound
+in the sense that if the right properties are specified, a successful verification means that there really are no bugs that violate these properties.
