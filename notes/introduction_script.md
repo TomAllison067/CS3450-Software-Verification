@@ -26,24 +26,22 @@ such that some property is violated?"
 
 If a property is violated, then CBMC can generate a counterexample in the form of a program trace.
 
-## Race conditions
-So, first, a simple example program taken straight from the CBMC tutorial.
+## Race conditions and segmentation faults
+This program is a beefed up version of one available from the CBMC tutorial, which comes with a race condition, and we've added a pointer error too.
 
 In this program, we have variable g that is shared by two threads. We launch a thread that sets the value of g to 2, and then set it to 1 in the main thread.
 
 The user-programmed assertion here asserts that g should be equal to 1, but depending on the order of execution of the threads, this assertion may fail.
 
-You could run this program many times over, as we did, and never fail this assertion - but CBMC won't let you get away with that. Imagine if this was some very complex and safety-critical system,
-then CBMC would really shine through - we don't want to wait until runtime for an assertion to fail and our software to crash, even if the chance is small!
+The thread ID returned by `pthread_create` is stored in a struct, and we've declared a pointer to this struct without actually allocating any memory for it.
+If we run this, we'll hit a segmentation fault.
 
-## Segmentation faults
-Now we build on from the previous program by adding another error. In this example, we declare a pointer to a struct that is intended to hold the thread ID returned by
-`pthread_create`, but do not allocate any memory to it.
+Running this with the `--pointer-check` option reveals that the program fails various properties related to pointer dereferencing, seen in figure 3.
 
-This program is valid C and will compile and run, but when we run it we'll hit a segmentation fault as we try to access unallocated memory. The correct way would be to `malloc` the memory
-as shown in the comments in the source code.
+In figure 2, we show the tail-end of a program trace which shows `g` being set to 1 in thread 0, and then 2 in thread 1, before the assertion fails.
 
-Verifying this with the `--pointer-check` option, CBMC shows us that the program fails numerous automatically generated assertions regarding pointers.
+Note that even with correct pointer handling, we could run this many times over (as we did) and never hit the assertion failure at runtime - but imagine if this was some
+safety critical software, we wouldn't want even the slightest chance of failure!
 
 ## Loop unwinding 1
 http://www.cprover.org/cprover-manual/cbmc/unwinding/
