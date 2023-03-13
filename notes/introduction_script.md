@@ -8,8 +8,7 @@ It can be used on all sorts of software, but one particular domain mentioned is 
 strict bounds on the number of iterations in loops, in which case CBMC is able to verify these bounds using loop unwinding, which will be elaborated on later in this video.
 
 CBMC is a sound tool, rather than a complete tool. It proves the absence of errors by verifying that properties hold on programs, rather than trying to find bugs. Note that its soundness
- is in context of the right properties being verified: the user can provide many properties to the command-line, e.g. `--memory-leak-check` and `--bounds-check`, but if you don't provide
- the right properties for your program, then certain bugs may not be found.
+ is in context of the right properties being verified. Its soundness will be elaborated on later, but the user can pass various properties to be checked via the command line.
 
 ## How it does it
 A property is defined as the state of the program when the program reaches a program location. 
