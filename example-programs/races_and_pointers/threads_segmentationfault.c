@@ -40,7 +40,7 @@ int main() {
   struct threadIdStruct* ptr;
   
   pthread_create(&ptr->id, NULL, thread, NULL);
-  pthread_join(ptr->id, NULL);
+  // Needed to fix: pthread_join(ptr->id, NULL);
   g = 1;
   assert(g==1);
   exit(0);

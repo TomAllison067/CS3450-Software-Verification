@@ -37,7 +37,7 @@ You could run this program many times over, as we did, and never fail this asser
 then CBMC would really shine through - we don't want to wait until runtime for an assertion to fail and our software to crash, even if the chance is small!
 
 ## Segmentation faults
-Building on from this example, we can show another property that this program would fail. In this example, we declare a pointer to a struct that is intended to hold the thread ID returned by
+Now we build on from the previous program by adding another error. In this example, we declare a pointer to a struct that is intended to hold the thread ID returned by
 `pthread_create`, but do not allocate any memory to it.
 
 This program is valid C and will compile and run, but when we run it we'll hit a segmentation fault as we try to access uninitialized memory. The correct way would be to `malloc` the memory
@@ -48,16 +48,19 @@ Verifying this with the `--pointer-check` option, CBMC shows us that the program
 ## Loop unwinding 1
 http://www.cprover.org/cprover-manual/cbmc/unwinding/
 
-CBMC model's a program's execution up to a bounded number of steps, achieved by a process known as loop unwinding. This can be thought of as the checker transforming loop code into equivalent
+CBMC models a program's execution up to a bounded number of steps, achieved by a process known as loop unwinding. This can be thought of as the checker transforming loop code into equivalent
 code without loops. For example, figure 1 on the left shows a while loop. If we tell the model checker to search for bugs for up to five iterations, then it corresponds to checking the loop-free code
-in figure 2.
+in figure 2, which as 5 nested if statements.
 
-CBMC can often automatically determine an upper boudn on the loop iterations. Figure 3 shows code with an upper bound of 100, but note that the loop could prematurely terminate depending on the return value
-of function f(). Even though the bound is not constant, CBMC may still be able to unwind the loop to completion.
+CBMC can often automatically determine an upper bound on the number of loop iterations. 
+Figure 3 shows code with an upper bound of 100, but note that the loop could prematurely terminate depending on the return value
+of some function f(), for which we do not know the implementation. 
+
+Even though the bound is not constant, CBMC may still be able to unwind the loop to completion.
 
 
 ## Loop unwinding 2
-The automatic detection of loop unwinding may fail if the number of loop iterations is highly data-dependent, or, in this example, depends on user input.
+The automatic detection of loop unwinding bounds may fail if the number of loop iterations is highly data-dependent, or, in this example, depends on user input.
 
 In the program in figure 1, there is an array-out-of-bounds error that occurs on line 17 if the value of i is greater than or equal to 10. If we compile and run this program, it'll ask us 
 for input to set the value of `n`. If `n` is greater than 10 then `i` is set to a value >= 10 and the inner if statement is entered, 
@@ -66,19 +69,39 @@ and we assign to an array outside of its bounds.
 Again, this program will compile and run without any errors - but this is dangerous: buffer overflow attacks can happen if someone assigns malicious code to a certain address next to an array,
 which can be executed if we access that address by accident in our program. We really need to be able to avoid manipulating addresses which we shouldn't be able to.
 
-If we run CBMC on this with `cbmc loop_unwinding.c --bounds-check`, it'll unwind the loop indefinitely and the analysis will never finish.
+If we run CBMC on this using the bounds check option without specifying an unwinding limit, it'll unwind the loop indefinitely and the analysis will never finish.
 
-To fix this, we can set the unwind limit for all loops in the program with the `--unwind` option, or for specific loops with `--unwindset`.
+To fix this, we can set the unwind limit for all loops in the program with the `--unwind` option, or for specific loops in the program with the `--unwindset` option.
 
 ## Properties are important!
+CBMC is sound in the sense that for all properties it seeks to verify, if there are no failures, then it really is the case that no properties have failed to verify - but,
+ we still need to pass cbmc the correct options.
+
 In the program on the right, we declare a pointer to an int with memory allocated for 10 integers, and we treat this as an array. We assign 10 values to this array,
-but print 11 values.
+but print 11 values later in the program. This is valid C: we're really just doing pointer arithmetic. 
 
 If we run this program, the last value printed out is some random, undefined number, because we're accessing some random memory just after the array.
+We mentioned buffer overflow attacks earlier on: if someone had put malicious code into the memory where we access the 11th index, we'd be in trouble.
 
-Now, with this program, we thought we'd finally found a bug that CBMC claims to find but actually fails - we ran it with the `--bounds-check` property and the verification passed.
+Now, with this program, we thought we'd finally found a bug that CBMC claims to find but actually doesn't - we ran it with the `--bounds-check` property and the verification passed.
 
 It turns out we were wrong: we needed to run it with the `--pointer-check` property, and the verification fails: we get a dereference failure, "pointer outside object bounds".
 
 So, CBMC really is very good - we didn't manage to beat it, but it does reinforce the point that it's important to specify the right properties to be checked. Again, CBMC is sound
 in the sense that if the right properties are specified, a successful verification means that there really are no bugs that violate these properties.
+
+## Large programs
+CBMC also works for non-trivial programs of course - we downloaded a tic-tac-toe program (https://github.com/mishal23/Tic-Tac-Toe) from github and ran CBMC on it. Now, interestingly, we got different
+results - on one Windows machine, with these flags we had 4 failures out of 592 checks, but on Unix we had 8 failures out of 399 checks and had to use the `--object-bits 63` option which sets the
+number of bits used for object addresses, or cbmc would fail.
+
+Note, for verifying modules or components of larger programs without a `main` function, you can use the `--function` option to tell CBMC which function to use as its entry point.
+
+## Useability and problems
+Another issue is that CBMC claims to verify C++, but we couldn't get it to work at all. You can specify different different language standards for C and C++, e.g. using the `--cpp11` option
+for C++ 11 (where it defaults to C++ 98), but with both language standards we got different errors.
+
+So, overall, CBMC is a really great program - but it seems like you have to know what you're doing with it: if you were using it as part of a large team and people were using different systems, you may 
+well get different results. We also tried to run it on student game projects that used graphics libraries, but CBMC wouldn't work on any program with a graphics library that we tried.
+
+Still, it's great for catching dangerous runtime errors, and can clearly be incredibly helpful in the right environment.
